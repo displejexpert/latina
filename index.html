@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#5b2a86">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Latina">
+<title>Latina kartičky</title>
+<style>
+:root{
+  --bg:#f4f1f8; --panel:#ffffff; --ink:#1f1a2b; --muted:#6d6680;
+  --accent:#6a2fa0; --accent2:#0aa5b8; --ok:#1f9d55; --bad:#d64545;
+  --front:linear-gradient(135deg,#6a2fa0,#3d2a8a);
+  --back:linear-gradient(135deg,#0aa5b8,#1877a8);
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#15121c;--panel:#221d2d;--ink:#eee9f6;--muted:#a49cb6;}
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  display:flex;flex-direction:column;align-items:center;padding:12px 16px calc(16px + env(safe-area-inset-bottom))}
+header{width:100%;max-width:520px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+h1{font-size:20px;margin:4px 0}
+.controls{width:100%;max-width:520px;display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+select,button{font:inherit;border:0;border-radius:10px;padding:10px 12px;background:var(--panel);color:var(--ink);
+  box-shadow:0 1px 3px rgba(0,0,0,.12);cursor:pointer}
+button.primary{background:var(--accent);color:#fff}
+button.on{background:var(--accent2);color:#fff}
+select{flex:1;min-width:120px}
+.progress{width:100%;max-width:520px;font-size:14px;color:var(--muted);display:flex;justify-content:space-between;margin:4px 0 6px}
+.bar{width:100%;max-width:520px;height:6px;background:rgba(127,127,127,.2);border-radius:3px;overflow:hidden}
+.bar>div{height:100%;background:var(--ok);width:0;transition:width .3s}
+.stage{width:100%;max-width:520px;flex:1;min-height:260px;max-height:420px;perspective:1200px;margin:14px 0}
+.card{width:100%;height:100%;position:relative;transform-style:preserve-3d;transition:transform .5s;cursor:pointer}
+.card.flipped{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;border-radius:20px;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;color:#fff;
+  box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.face.front{background:var(--front)}
+.face.back{background:var(--back);transform:rotateY(180deg)}
+.lang{position:absolute;top:14px;left:18px;font-size:12px;letter-spacing:.08em;opacity:.8;text-transform:uppercase}
+.word{font-size:clamp(26px,7vw,40px);font-weight:700;line-height:1.2;word-break:break-word}
+.hint{position:absolute;bottom:14px;font-size:12px;opacity:.7}
+.answer{display:flex;gap:10px;width:100%;max-width:520px}
+.answer button{flex:1;padding:16px;font-size:17px;font-weight:600;color:#fff}
+.answer .no{background:var(--bad)} .answer .yes{background:var(--ok)}
+.nav{display:flex;gap:10px;width:100%;max-width:520px;margin-top:10px}
+.nav button{flex:1}
+.done{text-align:center;padding:40px 20px;background:var(--panel);border-radius:20px;width:100%;max-width:520px}
+.small{font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<script>
+/* ===== SLOVÍČKA =====
+   Jeden řádek = jedno slovíčko:  latina ; čeština ; lekce
+   Lekce je nepovinná. Řádky začínající # se ignorují.
+   Nahraď ukázková slovíčka svými. */
+const WORDS = `
+rosa, -ae, f. ; růže ; Lekce 1
+puella, -ae, f. ; dívka ; Lekce 1
+aqua, -ae, f. ; voda ; Lekce 1
+terra, -ae, f. ; země ; Lekce 1
+amicus, -i, m. ; přítel ; Lekce 2
+dominus, -i, m. ; pán ; Lekce 2
+bellum, -i, n. ; válka ; Lekce 2
+amare ; milovat ; Lekce 3
+laudare ; chválit ; Lekce 3
+videre ; vidět ; Lekce 3
+`;
+</script>
+
+<header>
+  <h1>Latina kartičky</h1>
+  <button id="dirBtn" class="primary">LA → CZ</button>
+</header>
+
+<div class="controls">
+  <select id="lesson"></select>
+  <button id="onlyBad">Jen neumím</button>
+  <button id="shuffleBtn">Zamíchat</button>
+  <button id="resetBtn">Reset</button>
+</div>
+
+<div class="progress"><span id="pos"></span><span id="score"></span></div>
+<div class="bar"><div id="barFill"></div></div>
+
+<div class="stage" id="stage">
+  <div class="card" id="card">
+    <div class="face front"><span class="lang" id="langF"></span><div class="word" id="wordF"></div><span class="hint">klepni pro otočení</span></div>
+    <div class="face back"><span class="lang" id="langB"></span><div class="word" id="wordB"></div></div>
+  </div>
+</div>
+
+<div class="answer">
+  <button class="no" id="noBtn">✗ Neumím</button>
+  <button class="yes" id="yesBtn">✓ Umím</button>
+</div>
+<div class="nav">
+  <button id="prevBtn">← Zpět</button>
+  <button id="nextBtn">Další →</button>
+</div>
+<p class="small">Pokrok se ukládá jen v tomto prohlížeči.</p>
+
+<script>
+const all = WORDS.split('\n').map(l=>l.trim()).filter(l=>l && !l.startsWith('#')).map(l=>{
+  const [la,cz,lesson] = l.split(';').map(s=>(s||'').trim());
+  return {la, cz, lesson: lesson || 'Bez lekce', id: la+'|'+cz};
+}).filter(w=>w.la && w.cz);
+
+const store = {
+  get(k,d){try{const v=localStorage.getItem('latina_'+k);return v?JSON.parse(v):d}catch(e){return d}},
+  set(k,v){try{localStorage.setItem('latina_'+k,JSON.stringify(v))}catch(e){}}
+};
+let known = store.get('known',{});      // id -> true/false
+let dirLaCz = store.get('dir',true);
+let onlyBad = false;
+let deck = [], i = 0;
+
+const $ = id=>document.getElementById(id);
+const card=$('card');
+
+// lekce
+const lessons=[...new Set(all.map(w=>w.lesson))];
+$('lesson').innerHTML='<option value="*">Všechny lekce</option>'+lessons.map(l=>`<option>${l}</option>`).join('');
+$('lesson').value=store.get('lesson','*');
+if(![...$('lesson').options].some(o=>o.value===$('lesson').value)) $('lesson').value='*';
+
+function shuffle(a){for(let j=a.length-1;j>0;j--){const k=Math.floor(Math.random()*(j+1));[a[j],a[k]]=[a[k],a[j]]}return a}
+
+function build(doShuffle){
+  const l=$('lesson').value;
+  deck=all.filter(w=>(l==='*'||w.lesson===l)&&(!onlyBad||known[w.id]!==true));
+  if(doShuffle) shuffle(deck);
+  i=0; render();
+}
+
+function render(){
+  card.classList.remove('flipped');
+  $('dirBtn').textContent=dirLaCz?'LA → CZ':'CZ → LA';
+  $('onlyBad').classList.toggle('on',onlyBad);
+  const l=$('lesson').value;
+  const scope=all.filter(w=>l==='*'||w.lesson===l);
+  const ok=scope.filter(w=>known[w.id]===true).length;
+  $('score').textContent=`Umím ${ok} / ${scope.length}`;
+  $('barFill').style.width=scope.length?(ok/scope.length*100)+'%':'0';
+  if(!deck.length){
+    $('pos').textContent='';
+    $('stage').innerHTML=`<div class="done"><h2>🎉 Hotovo</h2><p>${onlyBad?'Všechna slovíčka v této lekci umíš.':'Žádná slovíčka.'}</p></div>`;
+    return;
+  }
+  if(!$('card')){location.reload();return}
+  const w=deck[i];
+  $('pos').textContent=`Karta ${i+1} / ${deck.length}`;
+  setTimeout(()=>{ // počkej na otočení zpět, ať se odpověď nemihne
+    $('langF').textContent=dirLaCz?'Latina':'Čeština';
+    $('langB').textContent=dirLaCz?'Čeština':'Latina';
+    $('wordF').textContent=dirLaCz?w.la:w.cz;
+    $('wordB').textContent=dirLaCz?w.cz:w.la;
+  }, card.dataset.init?150:0);
+  card.dataset.init=1;
+}
+
+function mark(v){
+  if(!deck.length) return;
+  known[deck[i].id]=v; store.set('known',known);
+  if(onlyBad && v){ deck.splice(i,1); if(i>=deck.length) i=0; render(); }
+  else next();
+}
+function next(){ if(!deck.length) return; i=(i+1)%deck.length; render(); }
+function prev(){ if(!deck.length) return; i=(i-1+deck.length)%deck.length; render(); }
+
+card.addEventListener('click',()=>card.classList.toggle('flipped'));
+$('yesBtn').onclick=()=>mark(true);
+$('noBtn').onclick=()=>mark(false);
+$('nextBtn').onclick=next;
+$('prevBtn').onclick=prev;
+$('shuffleBtn').onclick=()=>build(true);
+$('dirBtn').onclick=()=>{dirLaCz=!dirLaCz;store.set('dir',dirLaCz);render()};
+$('onlyBad').onclick=()=>{onlyBad=!onlyBad;build(true)};
+$('lesson').onchange=()=>{store.set('lesson',$('lesson').value);build(true)};
+$('resetBtn').onclick=()=>{if(confirm('Smazat celý pokrok?')){known={};store.set('known',known);build(true)}};
+
+// swipe na mobilu
+let sx=null;
+$('stage').addEventListener('touchstart',e=>sx=e.touches[0].clientX,{passive:true});
+$('stage').addEventListener('touchend',e=>{if(sx===null)return;const dx=e.changedTouches[0].clientX-sx;sx=null;
+  if(Math.abs(dx)>60){dx<0?next():prev()}},{passive:true});
+
+build(true);
+</script>
+</body>
+</html>
